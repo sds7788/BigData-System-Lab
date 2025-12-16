@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ query }} - 搜索结果</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <style>
+        :root { --ustc-blue: #004EA2; }
+        body { background-color: #f8f9fa; }
+        .navbar { background: var(--ustc-blue); }
+        
+        /* === 左侧：模式切换卡片 === */
+        .mode-switch-card {
+            background: white; border-radius: 8px; padding: 15px; margin-bottom: 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            border-left: 5px solid #6c757d; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: all 0.3s;
+        }
+        .mode-switch-card.ai-active {
+            border-left-color: var(--ustc-blue);
+            background: linear-gradient(to right, #fff, #f0f8ff);
+        }
+        
+        /* === 右侧：AI 侧边栏样式优化 === */
+        .sticky-sidebar {
+            position: sticky;
+            top: 80px; /* 距离顶部的距离，留出 navbar 的高度 */
+            z-index: 10;
+        }
+        
+        .rag-box {
+            background: linear-gradient(to bottom right, #ffffff, #f0f8ff);
+            border: 1px solid #dbeaff; border-radius: 10px; padding: 15px; 
+            margin-bottom: 25px;
+            box-shadow: 0 4px 15px rgba(0,78,162, 0.08);
+            transition: all 0.3s ease;
+        }
+        
+        /* === 搜索结果卡片 === */
+        .doc-card { 
+            background: white; border: 1px solid #eee; border-radius: 8px; padding: 20px; 
+            margin-bottom: 15px; transition: 0.2s; position: relative;
+        }
+        .doc-card:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+        
+        .score-badge {
+            position: absolute; right: 20px; top: 20px; font-size: 0.8rem;
+            background: #eee; padding: 2px 8px; border-radius: 4px; color: #666;
+        }
+        
+        /* Markdown 内容样式 */
+        .markdown-content p { margin-bottom: 0.5rem; }
+        .markdown-content ul, .markdown-content ol { padding-left: 1.2rem; margin-bottom: 0.5rem; }
+        .markdown-content code { background-color: #f1f3f5; color: #c7254e; padding: 2px 4px; border-radius: 4px; }
+        
+        /* 聊天记录区域 */
+        #local-chat-history { 
+            margin-bottom: 15px; 
+            font-size: 0.9rem;
+        }
+
+        /* === Diff 表格样式核心重构 === */
+        .diff-modal-body {
+            height: 80vh; 
+            overflow-y: auto;
+            background-color: #fff;
+            padding: 0;
+        }
+        
+        table.diff { 
+            width: 100%; border-collapse: collapse; font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9rem; table-layout: fixed; 
+        }
+        table.diff colgroup { display: none; }
+        table.diff .diff_next { display: none; } 
+        
+        table.diff .diff_header { 
+            background-color: #f7f7f7; color: #999; text-align: right; width: 3%; min-width: 30px;
+            padding-right: 5px; user-select: none; border-right: 1px solid #eee;
+        }
+
+        table.diff td { 
+            padding: 2px 8px; word-wrap: break-word; white-space: pre-wrap; vertical-align: top; line-height: 1.5;
+        }
+
+        table.diff td:nth-child(3) { width: 47%; border-right: 1px solid #ddd; }
+        table.diff td:nth-child(6) { width: 47%; }
+
+        .diff_sub { background-color: #ffebe9; color: #cf222e; text-decoration: none; }
+        .diff_add { background-color: #e6ffec; color: #1a7f37; }
+        .diff_chg { background-color: #fff8c5; color: #9a6700; }
+        
+        .modal-header-custom {
+            background: linear-gradient(to right, #f8f9fa, #fff);
+            border-bottom: 1px solid #eee;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="/">USTC Search</a>
+            <form class="d-flex" action="/search">
+                <input class="form-control me-2" type="search" name="q" value="{{ query }}">
+                <input type="hidden" name="mode" value="{{ mode }}">
+                <button class="btn btn-outline-light" type="submit">搜</button>
+            </form>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="mode-switch-card {% if mode == 'vector' %}ai-active{% endif %}">
+                    <div>
+                        <h6 class="mb-0 fw-bold">
+                            {% if mode == 'vector' %}
+                                <i class="fas fa-brain text-primary me-2"></i>AI 语义模式 (已开启)
+                            {% else %}
+                                <i class="fas fa-search text-secondary me-2"></i>标准检索模式
+                            {% endif %}
+                        </h6>
+                        <small class="text-muted">
+                            {% if mode == 'vector' %}
+                                使用向量嵌入 (Embedding) 理解语义。
+                            {% else %}
+                                使用 BM25 + PageRank 算法匹配关键词。
+                            {% endif %}
+                        </small>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="modeToggle" 
+                               style="width: 3em; height: 1.5em; cursor: pointer;"
+                               {% if mode == 'vector' %}checked{% endif %} 
+                               onchange="toggleMode(this)">
+                        <label class="form-check-label fw-bold ms-2" for="modeToggle" style="line-height: 1.5em;">开启 AI 增强</label>
+                    </div>
+                </div>
+
+                {% for doc in results %}
+                <div class="doc-card">
+                    <span class="score-badge">
+                        {% if mode == 'vector' %}
+                            相似度: {{ "%.4f"|format(doc.score) }}
+                        {% else %}
+                            综合得分: {{ "%.2f"|format(doc.score) }}
+                        {% endif %}
+                    </span>
+                    <h5 class="mb-1"><a href="{{ doc.info.url }}">{{ doc.info.title }}</a></h5>
+                    <p class="text-muted mb-2 small">{{ doc.info.date }} | {{ doc.info.dept }}</p>
+                    <p class="mb-1 text-secondary">{{ doc.content.clean_text[:150] }}...</p>
+                    
+                    {% if doc.images and doc.images|length > 0 %}
+                    <div class="mt-3 mb-2">
+                        <h6 class="small text-muted fw-bold"><i class="fas fa-image me-1"></i>包含图片/图表:</h6>
+                        <div class="d-flex overflow-auto pb-2" style="gap: 10px;">
+                            {% for img in doc.images %}
+                            <div class="border rounded p-1 bg-light text-center" style="min-width: 120px; max-width: 150px;">
+                                <img src="/images/{{ img.filename if img.filename else img.local_path.split('/')[-1] }}" 
+                                    class="img-fluid rounded mb-1" 
+                                    style="height: 80px; object-fit: cover; cursor: pointer;"
+                                    onclick="window.open(this.src, '_blank')"
+                                    alt="{{ img.caption }}">
+                                <div class="text-truncate small text-secondary" title="{{ img.caption }}" style="font-size: 0.75rem;">
+                                    {{ img.caption or '无标题图片' }}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if doc.diff.diff_html %}
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-outline-warning text-dark border-warning" 
+                                onclick="showDiffModal('diff-content-{{ loop.index }}', '{{ doc.info.title }}')">
+                            <i class="fas fa-exchange-alt me-1"></i>版本对比 (完整版)
+                        </button>
+                        <div id="diff-content-{{ loop.index }}" style="display:none;">
+                            {{ doc.diff.diff_html | safe }}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="alert alert-warning">未找到相关结果，请尝试切换搜索模式或精简关键词。</div>
+                {% endfor %}
+            </div>
+            
+            <div class="col-lg-4">
+                <div class="sticky-sidebar">
+                    <div class="rag-box">
+                        <h5 class="fw-bold" style="color: var(--ustc-blue); font-size: 1.1rem;">
+                            <i class="fas fa-sparkles me-2"></i>AI 智能综述
+                        </h5>
+                        
+                        <div id="ai-summary-content" class="markdown-content small" style="min-height: 60px;">
+                            <div class="text-muted"><i class="fas fa-spinner fa-spin me-2"></i>正在阅读 Top 3 文档并生成总结...</div>
+                        </div>
+
+                        <hr class="my-3">
+
+                        <div id="local-chat-history" class="ps-2 border-start border-2" 
+                             style="border-color: #e9ecef !important; max-height: 350px; overflow-y: auto;"></div>
+
+                        <div class="input-group mt-3">
+                            <input type="text" class="form-control form-control-sm" id="localAskInput" 
+                                   placeholder="基于以上结果追问..." autocomplete="off">
+                            <button class="btn btn-sm btn-outline-primary" onclick="askLocalAI()">发送</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="hidden-context" style="display:none;">{{ initial_context }}</div>
+
+    <div class="modal fade" id="diffModal" tabindex="-1">
+        <div class="modal-dialog modal-xl" style="max-width: 95%;">
+            <div class="modal-content" style="height: 90vh;">
+                <div class="modal-header modal-header-custom">
+                    <h5 class="modal-title"><i class="fas fa-columns me-2 text-primary"></i>版本全量对比: <span id="diffModalTitle" class="fw-bold"></span></h5>
+                    <div class="ms-auto d-flex align-items-center gap-3 me-3">
+                        <small class="badge bg-danger bg-opacity-10 text-danger border border-danger"><i class="fas fa-minus me-1"></i>旧版本 (删除)</small>
+                        <i class="fas fa-arrow-right text-muted"></i>
+                        <small class="badge bg-success bg-opacity-10 text-success border border-success"><i class="fas fa-plus me-1"></i>新版本 (新增)</small>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div class="diff-modal-body" id="diffModalBody">
+                        </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function showDiffModal(contentId, title) {
+            const diffHtml = document.getElementById(contentId).innerHTML;
+            document.getElementById('diffModalTitle').innerText = title;
+            document.getElementById('diffModalBody').innerHTML = diffHtml;
+            const modal = new bootstrap.Modal(document.getElementById('diffModal'));
+            modal.show();
+        }
+
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (!urlParams.has('mode')) {
+                urlParams.set('mode', 'keyword'); // 默认模式
+                window.location.search = urlParams.toString();
+                return;
+            }
+
+            const context = document.getElementById('hidden-context').innerText;
+            if(context.trim().length < 10) {
+                document.getElementById('ai-summary-content').innerHTML = "未找到足够文档，无法生成综述。";
+                return;
+            }
+            
+            // 自动触发一次总结
+            fetch('/api/ask', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ question: "请简要总结上述几篇文档的核心内容。", context: context, scope: 'local' })
+            })
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('ai-summary-content').innerHTML = marked.parse(data.answer);
+            });
+        }
+
+        function toggleMode(checkbox) {
+            const mode = checkbox.checked ? 'vector' : 'keyword';
+            const urlParams = new URLSearchParams(window.location.search);
+            urlParams.set('mode', mode);
+            window.location.search = urlParams.toString();
+        }
+
+        function askLocalAI() {
+            const input = document.getElementById('localAskInput');
+            const q = input.value;
+            const context = document.getElementById('hidden-context').innerText;
+            const history = document.getElementById('local-chat-history');
+
+            if(!q) return;
+            
+            // 添加用户提问
+            history.innerHTML += `<div class="text-end text-primary mb-2 small"><b>我:</b> ${q}</div>`;
+            input.value = '';
+            
+            const tempId = 'temp-loading-' + Date.now();
+            history.innerHTML += `<div id="${tempId}" class="text-start text-muted mb-3 small"><i class="fas fa-spinner fa-spin me-1"></i>AI 思考中...</div>`;
+
+            // 滚动到底部
+            const ragBox = document.querySelector('.rag-box'); // 也可以定位 history 容器
+            history.scrollTop = history.scrollHeight; 
+            
+            fetch('/api/ask', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ question: q, context: context, scope: 'local' })
+            })
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById(tempId).remove();
+                const htmlAns = marked.parse(data.answer);
+                history.innerHTML += `<div class="text-start text-dark mb-3 bg-light p-2 rounded markdown-content"><b>AI:</b> ${htmlAns}</div>`;
+                // 再次滚动到底部
+                history.scrollTop = history.scrollHeight;
+            });
+        }
+        
+        document.getElementById('localAskInput').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') askLocalAI();
+        });
+    </script>
+</body>
+</html>

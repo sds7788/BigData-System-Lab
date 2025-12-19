@@ -1,0 +1,82 @@
+# 爬虫配置
+crawler:
+  start_urls:
+
+#    - https://www.ustc.edu.cn/
+#    - https://www.teach.ustc.edu.cn
+#    - http://cs.ustc.edu.cn/20158/list.htm
+#    - https://sist.ustc.edu.cn/5111/list.htm
+#    - https://sist.ustc.edu.cn/5104/list.htm
+#    - http://www.job.ustc.edu.cn/Documentdownload/index.aspx
+#    - https://www.teach.ustc.edu.cn/
+#    - http://young.ustc.edu.cn/15056/list.htm
+#    - http://ustcnet.ustc.edu.cn/33419/list.htm
+#    - https://finance.ustc.edu.cn/xzzx/list.htm
+
+#    - https://www.teach.ustc.edu.cn/
+#    - https://gradschool.ustc.edu.cn/
+#    - https://saids.ustc.edu.cn/
+#    - https://zsb.ustc.edu.cn/
+#    - http://www.job.ustc.edu.cn/
+#    - https://finance.ustc.edu.cn/main.htm
+#    - http://zhb.ustc.edu.cn/18534/list1.htm
+#    - http://young.ustc.edu.cn/15056/list.htm
+#    - http://ustcnet.ustc.edu.cn/main.htm
+#    - http://cs.ustc.edu.cn/main.htm
+#    - http://cybersec.ustc.edu.cn/main.htm
+#    - https://math.ustc.edu.cn/main.htm
+#    - https://sz.ustc.edu.cn/index.html
+#    - https://iat.ustc.edu.cn/iat/index.html
+
+#    - https://news.ustc.edu.cn/
+#    - https://physics.ustc.edu.cn/main.htm
+#    - https://oic.ustc.edu.cn/
+#    - https://xxgk.ustc.edu.cn/main.htm
+#    - https://yz.ustc.edu.cn/
+
+    - https://www.ustc.edu.cn/
+    - https://stuhome.ustc.edu.cn/main.htm
+    - https://jgb.ustc.edu.cn/main.htm
+    - https://djyszw.ustc.edu.cn/
+    - https://news.ustc.edu.cn/djwh.htm
+    - https://fc.ustc.edu.cn/main.htm
+    - https://employment.ustc.edu.cn/cn/
+    - https://i.ustc.edu.cn/page/site/noticeAnnouncementvisitor
+
+  max_depth: 4
+  max_crawl: 10 #1000
+  max_download: 10 #1000
+  max_html : 5000 #5000
+  file_extensions:
+    - .pdf
+    - .docx
+  download_dir: "./output/raw_files/"
+  download_images: true  # 是否下载图片
+  image_download_dir: data/images  # 图片保存目录
+  max_images: 5000  # 最多下载图片数
+  max_images_per_page: 20  # 每个页面最多下载图片数
+
+# 处理配置
+processing:
+  text_encoding: utf-8
+  image_quality: 85
+  max_file_size_mb: 50
+  clean_text: true
+  extract_images: true
+  batch_size: 20 # 分批处理的批次大小
+
+# 输出配置
+output:
+  jsonl_path: "./output/jsonl/documents.jsonl"
+  html_jsonl_path: "./output/jsonl/html_contents.jsonl"
+  link_graph_path: "./output/jsonl/link_graph.json"
+  image_dir: "./output/images/"
+  batch_size: 1000
+  image_format: jpg
+
+html_extraction:
+  min_content_length: 200  # 网页最小内容长度
+  exclude_patterns: # 排除的URL模式
+    - ".*\\.(pdf|docx|doc|ppt|xls)$"
+    - ".*/download/.*"
+    - ".*/attachment/.*"

@@ -23,7 +23,7 @@ TABLE_NAME = 'ustc_docs'
 
 ZHIPU_CONFIG = {
     "enable": True,
-    "api_key": "87f1bb35745543f694d23ac62b629ac3.8AtkoIlBl9VOYw3L", 
+    "api_key": "", 
     "base_url": "https://open.bigmodel.cn/api/paas/v4",
     "chat_model": "glm-4.5",
     "embed_model": "embedding-3"
@@ -460,4 +460,5 @@ def api_ask():
 if __name__ == '__main__':
     print("\n🚀 USTC 搜索引擎 (HBase 增强版) 已启动!")
     print("   👉 请访问: http://localhost:5000")
+
     app.run(debug=True, port=5000)

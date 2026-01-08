@@ -39,7 +39,7 @@ OUTPUT_HDFS = "/output_step2"
 OUTPUT_LOCAL_DIR = "processed_data"
 
 ZHIPU_CONFIG = {
-    "api_key": "d9e61b3278a64232a29af36a22f627ed.tfHSwHcC0FVZ812A", 
+    "api_key": "", 
     "base_url": "https://open.bigmodel.cn/api/paas/v4",
     "model": "embedding-3" 
 }
@@ -270,4 +270,5 @@ if __name__ == '__main__':
     run_diff_local()
     run_vector_local()
     
+
     print("\n🎉 全部处理完成！请运行 python app.py 启动搜索引擎。")

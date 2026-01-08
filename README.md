@@ -1,6 +1,6 @@
 # USTC Data Insight - 智能校园大数据检索系统
 
-![Logo](static/logo.png)
+<img src="static/logo.png" alt="Logo" width="100" />
 
 > 基于 Hadoop 生态与大模型 RAG 技术的中国科学技术大学校园文档检索引擎。
 
